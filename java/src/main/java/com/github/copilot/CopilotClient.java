@@ -641,6 +641,9 @@ public final class CopilotClient implements AutoCloseable {
                 if (request.getMemory() == null) {
                     request.setMemory(new MemoryConfiguration().setEnabled(false));
                 }
+                if (request.getIsExperimentalMode() == null) {
+                    request.setIsExperimentalMode(false);
+                }
                 if (request.getMcpOAuthTokenStorage() == null) {
                     request.setMcpOAuthTokenStorage("in-memory");
                 }
@@ -799,6 +802,9 @@ public final class CopilotClient implements AutoCloseable {
                 }
                 if (request.getMemory() == null) {
                     request.setMemory(new MemoryConfiguration().setEnabled(false));
+                }
+                if (request.getIsExperimentalMode() == null) {
+                    request.setIsExperimentalMode(false);
                 }
                 if (request.getMcpOAuthTokenStorage() == null) {
                     request.setMcpOAuthTokenStorage("in-memory");

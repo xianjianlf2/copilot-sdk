@@ -1995,6 +1995,11 @@ pub struct SessionConfig {
     /// the initial create request and maintained via `session.options.update`.
     /// Defaults to `true` in [`crate::ClientMode::Empty`] when unset.
     pub custom_agents_local_only: Option<bool>,
+    /// Controls whether the session enables experimental features.
+    ///
+    /// Defaults to `false` in [`crate::ClientMode::Empty`] when unset;
+    /// in `copilot-cli` mode, leaving this unset lets the runtime decide.
+    pub enable_experimental_mode: Option<bool>,
     /// Whether to include the `Co-authored-by` trailer in commit messages.
     /// Applied via `session.options.update` after create/resume. Defaults to
     /// `false` in [`crate::ClientMode::Empty`] when unset.
@@ -2087,6 +2092,7 @@ impl std::fmt::Debug for SessionConfig {
             .field("commands", &self.commands)
             .field("exp_assignments", &self.exp_assignments)
             .field("enable_managed_settings", &self.enable_managed_settings)
+            .field("enable_experimental_mode", &self.enable_experimental_mode)
             .field(
                 "session_fs_provider",
                 &self.session_fs_provider.as_ref().map(|_| "<set>"),
@@ -2207,6 +2213,7 @@ impl Default for SessionConfig {
             system_message_transform: None,
             skip_custom_instructions: None,
             custom_agents_local_only: None,
+            enable_experimental_mode: None,
             coauthor_enabled: None,
             manage_schedule_enabled: None,
         }
@@ -2355,6 +2362,7 @@ impl SessionConfig {
             commands: wire_commands,
             exp_assignments: self.exp_assignments,
             enable_managed_settings: self.enable_managed_settings,
+            is_experimental_mode: self.enable_experimental_mode,
         };
 
         let runtime = SessionConfigRuntime {
@@ -2912,6 +2920,12 @@ impl SessionConfig {
         self
     }
 
+    /// Set [`enable_experimental_mode`](Self::enable_experimental_mode).
+    pub fn with_enable_experimental_mode(mut self, enable_experimental_mode: bool) -> Self {
+        self.enable_experimental_mode = Some(enable_experimental_mode);
+        self
+    }
+
     /// Set [`Self::coauthor_enabled`].
     pub fn with_coauthor_enabled(mut self, value: bool) -> Self {
         self.coauthor_enabled = Some(value);
@@ -3170,6 +3184,11 @@ pub struct ResumeSessionConfig {
     pub skip_custom_instructions: Option<bool>,
     /// See [`SessionConfig::custom_agents_local_only`].
     pub custom_agents_local_only: Option<bool>,
+    /// Controls whether the session enables experimental features.
+    ///
+    /// Defaults to `false` in [`crate::ClientMode::Empty`] when unset;
+    /// in `copilot-cli` mode, leaving this unset lets the runtime decide.
+    pub enable_experimental_mode: Option<bool>,
     /// See [`SessionConfig::coauthor_enabled`].
     pub coauthor_enabled: Option<bool>,
     /// See [`SessionConfig::manage_schedule_enabled`].
@@ -3258,6 +3277,7 @@ impl std::fmt::Debug for ResumeSessionConfig {
             .field("commands", &self.commands)
             .field("exp_assignments", &self.exp_assignments)
             .field("enable_managed_settings", &self.enable_managed_settings)
+            .field("enable_experimental_mode", &self.enable_experimental_mode)
             .field(
                 "session_fs_provider",
                 &self.session_fs_provider.as_ref().map(|_| "<set>"),
@@ -3411,6 +3431,7 @@ impl ResumeSessionConfig {
             commands: wire_commands,
             exp_assignments: self.exp_assignments,
             enable_managed_settings: self.enable_managed_settings,
+            is_experimental_mode: self.enable_experimental_mode,
             suppress_resume_event: self.suppress_resume_event,
             continue_pending_work: self.continue_pending_work,
         };
@@ -3515,6 +3536,7 @@ impl ResumeSessionConfig {
             system_message_transform: None,
             skip_custom_instructions: None,
             custom_agents_local_only: None,
+            enable_experimental_mode: None,
             coauthor_enabled: None,
             manage_schedule_enabled: None,
         }
@@ -4042,6 +4064,12 @@ impl ResumeSessionConfig {
     /// Set [`Self::custom_agents_local_only`].
     pub fn with_custom_agents_local_only(mut self, value: bool) -> Self {
         self.custom_agents_local_only = Some(value);
+        self
+    }
+
+    /// Set [`enable_experimental_mode`](Self::enable_experimental_mode).
+    pub fn with_enable_experimental_mode(mut self, enable_experimental_mode: bool) -> Self {
+        self.enable_experimental_mode = Some(enable_experimental_mode);
         self
     }
 
@@ -7215,5 +7243,62 @@ mod permission_builder_tests {
             dispatch(&hb).await,
             PermissionResult::Decision(PermissionDecision::ApproveOnce(_))
         ));
+    }
+
+    #[test]
+    fn session_config_enable_experimental_mode_serializes_when_set() {
+        let cfg = SessionConfig::default().with_enable_experimental_mode(false);
+        assert_eq!(cfg.enable_experimental_mode, Some(false));
+
+        let (wire, _runtime) = cfg
+            .into_wire(Some(SessionId::from("experimental-mode")))
+            .expect("enable_experimental_mode config has no duplicate handlers");
+        assert_eq!(wire.is_experimental_mode, Some(false));
+
+        let json = serde_json::to_value(&wire).unwrap();
+        assert_eq!(json["isExperimentalMode"], serde_json::Value::Bool(false));
+    }
+
+    #[test]
+    fn session_config_enable_experimental_mode_omitted_when_none() {
+        let cfg = SessionConfig::default();
+        assert_eq!(cfg.enable_experimental_mode, None);
+
+        let (wire, _runtime) = cfg
+            .into_wire(Some(SessionId::from("no-experimental-mode")))
+            .expect("default config has no duplicate handlers");
+        assert_eq!(wire.is_experimental_mode, None);
+
+        let json = serde_json::to_value(&wire).unwrap();
+        assert!(json.get("isExperimentalMode").is_none());
+    }
+
+    #[test]
+    fn resume_session_config_enable_experimental_mode_serializes_when_set() {
+        let cfg = ResumeSessionConfig::new(SessionId::from("resume-experimental-mode"))
+            .with_enable_experimental_mode(false);
+        assert_eq!(cfg.enable_experimental_mode, Some(false));
+
+        let (wire, _runtime) = cfg
+            .into_wire()
+            .expect("resume enable_experimental_mode config has no duplicate handlers");
+        assert_eq!(wire.is_experimental_mode, Some(false));
+
+        let json = serde_json::to_value(&wire).unwrap();
+        assert_eq!(json["isExperimentalMode"], serde_json::Value::Bool(false));
+    }
+
+    #[test]
+    fn resume_session_config_enable_experimental_mode_omitted_when_none() {
+        let cfg = ResumeSessionConfig::new(SessionId::from("resume-no-experimental-mode"));
+        assert_eq!(cfg.enable_experimental_mode, None);
+
+        let (wire, _runtime) = cfg
+            .into_wire()
+            .expect("default resume config has no duplicate handlers");
+        assert_eq!(wire.is_experimental_mode, None);
+
+        let json = serde_json::to_value(&wire).unwrap();
+        assert!(json.get("isExperimentalMode").is_none());
     }
 }
