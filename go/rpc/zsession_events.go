@@ -399,14 +399,12 @@ func (*SessionCompactionStartData) Type() SessionEventType {
 	return SessionEventTypeSessionCompactionStart
 }
 
-// Context-cleared details emitted when the clear_context tool resets the conversation
+// Context-cleared details emitted when the host clears the conversation (the session.history.clearContext RPC / Session.clearContextMessages)
 type SessionContextClearedData struct {
 	// Optional initial message set after clearing
 	InitialMessage *string `json:"initialMessage,omitempty"`
 	// Number of conversation messages that were cleared
 	MessagesCleared int64 `json:"messagesCleared"`
-	// Runtime-injected messages re-seeded into the freshly-cleared context (e.g. self-paced loop wrappers). Persisted so a resumed session reproduces the same post-clear window instead of resurrecting the pre-clear history.
-	PrependMessages []string `json:"prependMessages,omitzero"`
 }
 
 func (*SessionContextClearedData) sessionEventData() {}

@@ -4826,6 +4826,36 @@ pub struct HistoryCancelBackgroundCompactionResult {
     pub cancelled: bool,
 }
 
+/// Parameters for clearing the conversation and seeding the window that replaces it.
+///
+/// <div class="warning">
+///
+/// **Experimental.** This type is part of an experimental wire-protocol surface
+/// and may change or be removed in future SDK or CLI releases.
+///
+/// </div>
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryClearContextRequest {
+    /// First user message of the fresh context window. Required: a cleared window holding only system and developer messages is not a conversation a model can answer, so every clear seeds the window it creates. Delivered by the enclosing turn driver once the agentic loop exits, which is why the call must be made from inside a tool handler.
+    pub prompt: String,
+}
+
+/// What a successful clear removed. A clear that could not be applied rejects instead of reporting a count.
+///
+/// <div class="warning">
+///
+/// **Experimental.** This type is part of an experimental wire-protocol surface
+/// and may change or be removed in future SDK or CLI releases.
+///
+/// </div>
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryClearContextResult {
+    /// Number of non-system, non-developer messages that were removed from the conversation. Zero only when the window already held no conversation.
+    pub messages_cleared: i64,
+}
+
 /// Post-compaction context window usage breakdown
 ///
 /// <div class="warning">
@@ -17934,37 +17964,6 @@ pub struct WorkspacesWriteAutopilotObjectiveResult {
     pub operation: String,
 }
 
-/// Optional seed for the context window created by the clear.
-///
-/// <div class="warning">
-///
-/// **Experimental.** This type is part of an experimental wire-protocol surface
-/// and may change or be removed in future SDK or CLI releases.
-///
-/// </div>
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct HistoryClearContextRequest {
-    /// First user message to deliver in the fresh context window. Delivered by the enclosing turn driver, so it is only meaningful when the call is made from inside an active turn (for example from a tool handler). Omit to start the fresh window with no seed.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub prompt: Option<String>,
-}
-
-/// Number of conversation messages removed by the clear.
-///
-/// <div class="warning">
-///
-/// **Experimental.** This type is part of an experimental wire-protocol surface
-/// and may change or be removed in future SDK or CLI releases.
-///
-/// </div>
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct HistoryClearContextResult {
-    /// Number of non-system, non-developer messages that were removed from the conversation. Zero when the session is remote or already empty.
-    pub messages_cleared: i64,
-}
-
 /// List of Copilot models available to the resolved user, including capabilities and billing metadata.
 ///
 /// <div class="warning">
@@ -22312,7 +22311,7 @@ pub struct SessionHistorySummarizeForHandoffResult {
     pub summary: String,
 }
 
-/// Number of conversation messages removed by the clear.
+/// What a successful clear removed. A clear that could not be applied rejects instead of reporting a count.
 ///
 /// <div class="warning">
 ///
@@ -22323,7 +22322,7 @@ pub struct SessionHistorySummarizeForHandoffResult {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionHistoryClearContextResult {
-    /// Number of non-system, non-developer messages that were removed from the conversation. Zero when the session is remote or already empty.
+    /// Number of non-system, non-developer messages that were removed from the conversation. Zero only when the window already held no conversation.
     pub messages_cleared: i64,
 }
 

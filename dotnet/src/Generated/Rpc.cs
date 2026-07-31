@@ -12935,22 +12935,22 @@ internal sealed class SessionHistorySummarizeForHandoffRequest
     public string SessionId { get; set; } = string.Empty;
 }
 
-/// <summary>Number of conversation messages removed by the clear.</summary>
+/// <summary>What a successful clear removed. A clear that could not be applied rejects instead of reporting a count.</summary>
 [Experimental(Diagnostics.Experimental)]
 public sealed class HistoryClearContextResult
 {
-    /// <summary>Number of non-system, non-developer messages that were removed from the conversation. Zero when the session is remote or already empty.</summary>
+    /// <summary>Number of non-system, non-developer messages that were removed from the conversation. Zero only when the window already held no conversation.</summary>
     [JsonPropertyName("messagesCleared")]
     public long MessagesCleared { get; set; }
 }
 
-/// <summary>Optional seed for the context window created by the clear.</summary>
+/// <summary>Parameters for clearing the conversation and seeding the window that replaces it.</summary>
 [Experimental(Diagnostics.Experimental)]
 internal sealed class HistoryClearContextRequest
 {
-    /// <summary>First user message to deliver in the fresh context window. Delivered by the enclosing turn driver, so it is only meaningful when the call is made from inside an active turn (for example from a tool handler). Omit to start the fresh window with no seed.</summary>
+    /// <summary>First user message of the fresh context window. Required: a cleared window holding only system and developer messages is not a conversation a model can answer, so every clear seeds the window it creates. Delivered by the enclosing turn driver once the agentic loop exits, which is why the call must be made from inside a tool handler.</summary>
     [JsonPropertyName("prompt")]
-    public string? Prompt { get; set; }
+    public string Prompt { get; set; } = string.Empty;
 
     /// <summary>Target session identifier.</summary>
     [JsonPropertyName("sessionId")]
@@ -27256,12 +27256,13 @@ public sealed class HistoryApi
         return await CopilotClient.InvokeRpcAsync<HistorySummarizeForHandoffResult>(_session.Rpc, "session.history.summarizeForHandoff", [request], cancellationToken);
     }
 
-    /// <summary>Clears the session's conversation history, keeping only system and developer messages, and optionally seeds the fresh context window with a first user message.</summary>
-    /// <param name="prompt">First user message to deliver in the fresh context window. Delivered by the enclosing turn driver, so it is only meaningful when the call is made from inside an active turn (for example from a tool handler). Omit to start the fresh window with no seed.</param>
+    /// <summary>Clears the session's conversation history, keeping only system and developer messages, and seeds the fresh context window with a first user message. Must be called from inside a tool handler: the clear has to drop the results of the tool calls its wipe orphans, and it rejects when no tool call is in flight.</summary>
+    /// <param name="prompt">First user message of the fresh context window. Required: a cleared window holding only system and developer messages is not a conversation a model can answer, so every clear seeds the window it creates. Delivered by the enclosing turn driver once the agentic loop exits, which is why the call must be made from inside a tool handler.</param>
     /// <param name="cancellationToken">The <see cref="CancellationToken"/> to monitor for cancellation requests. The default is <see cref="CancellationToken.None"/>.</param>
-    /// <returns>Number of conversation messages removed by the clear.</returns>
-    public async Task<HistoryClearContextResult> ClearContextAsync(string? prompt = null, CancellationToken cancellationToken = default)
+    /// <returns>What a successful clear removed. A clear that could not be applied rejects instead of reporting a count.</returns>
+    public async Task<HistoryClearContextResult> ClearContextAsync(string prompt, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(prompt);
         _session.ThrowIfDisposed();
 
         var request = new HistoryClearContextRequest { SessionId = _session.SessionId, Prompt = prompt };

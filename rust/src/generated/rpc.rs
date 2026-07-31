@@ -4975,17 +4975,17 @@ impl<'a> SessionRpcHistory<'a> {
         Ok(serde_json::from_value(_value)?)
     }
 
-    /// Clears the session's conversation history, keeping only system and developer messages, and optionally seeds the fresh context window with a first user message.
+    /// Clears the session's conversation history, keeping only system and developer messages, and seeds the fresh context window with a first user message. Must be called from inside a tool handler: the clear has to drop the results of the tool calls its wipe orphans, and it rejects when no tool call is in flight.
     ///
     /// Wire method: `session.history.clearContext`.
     ///
     /// # Parameters
     ///
-    /// * `params` - Optional seed for the context window created by the clear.
+    /// * `params` - Parameters for clearing the conversation and seeding the window that replaces it.
     ///
     /// # Returns
     ///
-    /// Number of conversation messages removed by the clear.
+    /// What a successful clear removed. A clear that could not be applied rejects instead of reporting a count.
     ///
     /// <div class="warning">
     ///

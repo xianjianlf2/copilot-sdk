@@ -2933,22 +2933,24 @@ type HistoryCancelBackgroundCompactionResult struct {
 	Cancelled bool `json:"cancelled"`
 }
 
-// Optional seed for the context window created by the clear.
+// Parameters for clearing the conversation and seeding the window that replaces it.
 // Experimental: HistoryClearContextRequest is part of an experimental API and may change or
 // be removed.
 type HistoryClearContextRequest struct {
-	// First user message to deliver in the fresh context window. Delivered by the enclosing
-	// turn driver, so it is only meaningful when the call is made from inside an active turn
-	// (for example from a tool handler). Omit to start the fresh window with no seed.
-	Prompt *string `json:"prompt,omitempty"`
+	// First user message of the fresh context window. Required: a cleared window holding only
+	// system and developer messages is not a conversation a model can answer, so every clear
+	// seeds the window it creates. Delivered by the enclosing turn driver once the agentic loop
+	// exits, which is why the call must be made from inside a tool handler.
+	Prompt string `json:"prompt"`
 }
 
-// Number of conversation messages removed by the clear.
+// What a successful clear removed. A clear that could not be applied rejects instead of
+// reporting a count.
 // Experimental: HistoryClearContextResult is part of an experimental API and may change or
 // be removed.
 type HistoryClearContextResult struct {
 	// Number of non-system, non-developer messages that were removed from the conversation.
-	// Zero when the session is remote or already empty.
+	// Zero only when the window already held no conversation.
 	MessagesCleared int64 `json:"messagesCleared"`
 }
 
@@ -17870,19 +17872,21 @@ func (a *HistoryAPI) CancelBackgroundCompaction(ctx context.Context) (*HistoryCa
 }
 
 // ClearContext clears the session's conversation history, keeping only system and developer
-// messages, and optionally seeds the fresh context window with a first user message.
+// messages, and seeds the fresh context window with a first user message. Must be called
+// from inside a tool handler: the clear has to drop the results of the tool calls its wipe
+// orphans, and it rejects when no tool call is in flight.
 //
 // RPC method: session.history.clearContext.
 //
-// Parameters: Optional seed for the context window created by the clear.
+// Parameters: Parameters for clearing the conversation and seeding the window that replaces
+// it.
 //
-// Returns: Number of conversation messages removed by the clear.
+// Returns: What a successful clear removed. A clear that could not be applied rejects
+// instead of reporting a count.
 func (a *HistoryAPI) ClearContext(ctx context.Context, params *HistoryClearContextRequest) (*HistoryClearContextResult, error) {
 	req := map[string]any{"sessionId": a.sessionID}
 	if params != nil {
-		if params.Prompt != nil {
-			req["prompt"] = *params.Prompt
-		}
+		req["prompt"] = params.Prompt
 	}
 	raw, err := a.client.Request(ctx, "session.history.clearContext", req)
 	if err != nil {

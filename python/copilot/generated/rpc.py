@@ -2892,34 +2892,35 @@ class HistoryCancelBackgroundCompactionResult:
 # Experimental: this type is part of an experimental API and may change or be removed.
 @dataclass
 class HistoryClearContextRequest:
-    """Optional seed for the context window created by the clear."""
+    """Parameters for clearing the conversation and seeding the window that replaces it."""
 
-    prompt: str | None = None
-    """First user message to deliver in the fresh context window. Delivered by the enclosing
-    turn driver, so it is only meaningful when the call is made from inside an active turn
-    (for example from a tool handler). Omit to start the fresh window with no seed.
+    prompt: str
+    """First user message of the fresh context window. Required: a cleared window holding only
+    system and developer messages is not a conversation a model can answer, so every clear
+    seeds the window it creates. Delivered by the enclosing turn driver once the agentic loop
+    exits, which is why the call must be made from inside a tool handler.
     """
 
     @staticmethod
     def from_dict(obj: Any) -> 'HistoryClearContextRequest':
         assert isinstance(obj, dict)
-        prompt = from_union([from_str, from_none], obj.get("prompt"))
+        prompt = from_str(obj.get("prompt"))
         return HistoryClearContextRequest(prompt)
 
     def to_dict(self) -> dict:
         result: dict = {}
-        if self.prompt is not None:
-            result["prompt"] = from_union([from_str, from_none], self.prompt)
+        result["prompt"] = from_str(self.prompt)
         return result
 
 # Experimental: this type is part of an experimental API and may change or be removed.
 @dataclass
 class HistoryClearContextResult:
-    """Number of conversation messages removed by the clear."""
-
+    """What a successful clear removed. A clear that could not be applied rejects instead of
+    reporting a count.
+    """
     messages_cleared: int
     """Number of non-system, non-developer messages that were removed from the conversation.
-    Zero when the session is remote or already empty.
+    Zero only when the window already held no conversation.
     """
 
     @staticmethod
@@ -33172,7 +33173,7 @@ class HistoryApi:
         return HistorySummarizeForHandoffResult.from_dict(await self._client.request("session.history.summarizeForHandoff", {"sessionId": self._session_id}, **_timeout_kwargs(timeout)))
 
     async def clear_context(self, params: HistoryClearContextRequest, *, timeout: float | None = None) -> HistoryClearContextResult:
-        "Clears the session's conversation history, keeping only system and developer messages, and optionally seeds the fresh context window with a first user message.\n\nArgs:\n    params: Optional seed for the context window created by the clear.\n\nReturns:\n    Number of conversation messages removed by the clear."
+        "Clears the session's conversation history, keeping only system and developer messages, and seeds the fresh context window with a first user message. Must be called from inside a tool handler: the clear has to drop the results of the tool calls its wipe orphans, and it rejects when no tool call is in flight.\n\nArgs:\n    params: Parameters for clearing the conversation and seeding the window that replaces it.\n\nReturns:\n    What a successful clear removed. A clear that could not be applied rejects instead of reporting a count."
         params_dict: dict[str, Any] = {k: v for k, v in params.to_dict().items() if v is not None}
         params_dict["sessionId"] = self._session_id
         return HistoryClearContextResult.from_dict(await self._client.request("session.history.clearContext", params_dict, **_timeout_kwargs(timeout)))
